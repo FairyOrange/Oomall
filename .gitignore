@@ -1,0 +1,8 @@
+*.log
+*.iml
+.idea/
+.history/
+target/
+.DS_Store
+other/doc/测试文档名称.html
+doc/测试文档名称.html

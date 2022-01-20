@@ -1,0 +1,357 @@
+server:
+  port: 8881
+
+dubbo:
+  # 配置服务信息
+  application:
+    name: privilege-gateway
+    # 禁用QOS同一台机器可能会有端口冲突现象
+    qos-enable: false
+    qos-accept-foreign-ip: false
+  # 配置注册中心
+  registry:
+    address: nacos://172.16.1.156:8848
+  # 设置协议-协议由提供方指定消费方被动接受
+  protocol:
+    name: dubbo
+    port: -1
+    # 设置超时时间
+    host: 172.16.1.167
+  consumer:
+    timeout: 4000
+    check: false
+
+spring:
+  application:
+    name: privilege-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 172.16.1.156:8848
+        ip: 172.16.1.167
+    gateway:
+      discovery:
+        locator:
+          enabled: true  #表明gateway开启服务注册和发现的功能，并且spring cloud gateway自动根据服务发现为每一个服务创建了一个router，这个router将以服务名开头的请求路径转发到对应的服务。
+          lowerCaseServiceId: true   #是将请求路径上的服务名配置为小写（因为服务注册的时候，向注册中心注册时将服务名转成大写的了），比如以/service-hi/*的请求路径被路由转发到服务名为service-hi的服务上。
+          filters:
+            - StripPrefix=1
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - HEAD
+              - OPTIONS
+              - GET
+              - POST
+              - PUT
+              - DELETE
+      routes:
+        - id: withoutToken
+          uri: lb://privilege-service
+          predicates:
+            - Method=POST
+            - Path=/adminusers,/adminusers/login
+          filters:
+            - PrefixPath=/privilege
+
+        - id: privilegewithoutToken
+          uri: lb://privilege-service
+          predicates:
+            - Path=/adminusers/states
+          filters:
+            - PrefixPath=/privilege
+        - id: privilege
+          uri: lb://privilege-service
+          predicates:
+            - Path=/adminusers/**,/shops/{shopid}/adminusers/**,/proxies/**,/shops/{shopid}/proxies/**,/roles/**,/shops/{shopid}/roles/**,/shops/{shopid}/roleprivileges/**,/privileges/**
+          filters:
+            - PrefixPath=/privilege
+            - Auth=authorization
+
+        - id: userWithoutToken
+          uri: lb://user-service
+          predicates:
+            - Path=/users/states
+          filters:
+            - PrefixPath=/other
+        - id: user
+          uri: lb://user-service
+          predicates:
+            - Path=/users/all,/users/{id},/shops/{shopid}/users/{id}/ban,/shops/{shopid}/users/{id}/release
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: footprint
+          uri: lb://footprint-service
+          predicates:
+            - Path=/shops/{shopid}/footprints
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: favorite
+          uri: lb://favorite-service
+          predicates:
+            - Path=
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: time
+          uri: lb://time-service
+          predicates:
+            - Path=/shops/{shopid}/advertisement/timesegments,/shops/{shopid}/advertisement/timesegments/{id},/shops/{shopid}/flashsale/timesegments,/shops/{shopid}/flashsale/timesegments/{id}
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: advertiseWithoutToken
+          uri: lb://advertise-service
+          predicates:
+            - Path=/advertisement/states
+          filters:
+            - PrefixPath=/other
+        - id: advertise
+          uri: lb://advertise-service
+          predicates:
+            - Path=/shops/{shopid}/advertisement/{id},/shops/{shopid}/advertisement/{id}/default,/shops/{shopid}/advertisement/{id}/uploadImg,/shops/{shopid}/advertisement/{id}/onshelves,/shops/{shopid}/advertisement/{id}/offshelves,/shops/{shopid}/advertisement/{id}/audit,/shops/{shopid}/timesegments/{id}/advertisement,/shops/{shopid}/timesegments/{id}/advertisement/{aid}
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: aftersaleWithoutToken
+          uri: lb://aftersale-service
+          predicates:
+            - Path=/aftersales/states
+          filters:
+            - PrefixPath=/other
+        - id: aftersale
+          uri: lb://aftersale-service
+          predicates:
+            - Path=/shops/{shopid}/aftersales,/shops/{shopid}/aftersales/{id},/shops/{shopid}/aftersales/{id}/confirm,/shops/{shopid}/aftersales/{id}/receive,/shops/{shopid}/aftersales/{id}/deliver
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+#        - id: addressWithoutToken
+#          uri: lb://address-service
+#          predicates:
+#            - Path=/region/{id}/ancestor
+#          filters:
+#            - PrefixPath=/other
+        - id: address
+          uri: lb://address-service
+          predicates:
+            - Path=/shops/{shopid}/regions/{id},/shops/{did}/regions/{id}/subregions
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: cart
+          uri: lb://cart-service
+          predicates:
+            - Path=
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: share
+          uri: lb://share-service
+          predicates:
+            - Path=/shops/{shopid}/skus/{id}/shares,/shops/{shopid}/skus/{id}/beshared,/shops/{shopid}/skus/{skuId}/shareactivities,/shops/{shopid}/shareactivities/{id},/shops/{shopid}/shareactivities/{id}/online
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+        - id: orderWithoutToken
+          uri: lb://order-service
+          predicates:
+            - Path=/orders/states
+          filters:
+            - PrefixPath=/order
+        - id: order
+          uri: lb://order-service
+          predicates:
+            - Path=/shops/{shopid}/orders,/shops/{shopid}/orders/{id},/shops/{shopId}/orders/{id}/deliver
+          filters:
+            - PrefixPath=/order
+            - Auth=authorization
+
+        - id: freight
+          uri: lb://freight-service
+          predicates:
+            - Path=/shops/{shopid}/freightmodels,/shops/{shopid}/freightmodels/{id},/shops/{shopid}/freightmodels/{id}/clone,/shops/{shopid}/freightmodels/{id}/default,/shops/{shopid}/freightmodels/{id}/weightItems,/shops/{shopid}/freightmodels/{id}/pieceItems,/shops/{shopid}/weightItems/{id},/shops/{shopid}/pieceItems/{id},/shops/{shopid}/freight_models/**
+          filters:
+            - PrefixPath=/order
+            - Auth=authorization
+
+        - id: paymentWithoutToken
+          uri: lb://payment-service
+          predicates:
+            - Path=/payments/states
+          filters:
+            - PrefixPath=/order
+        - id: payment
+          uri: lb://payment-service
+          predicates:
+            - Path=/shops/{shopid}/orders/{id}/payments,/shops/{shopid}/aftersales/{id}/payments,/shops/{shopid}/payments/{id}/refunds,/shops/{shopid}/orders/{id}/refunds,/shops/{shopid}/aftersales/{id}/refunds
+          filters:
+            - PrefixPath=/order
+            - Auth=authorization
+
+        - id: goodsWithoutToken
+          uri: lb://goods-service
+          predicates:
+            - Path=/skus/states
+          filters:
+            - PrefixPath=/goods
+        - id: goods
+          uri: lb://goods-service
+          predicates:
+            - Path=/shops/{shopid}/spus/{id}/skus,/shops/{shopid}/skus/{id}/uploadImg,/shops/{shopid}/skus/{id},/shops/{shopid}/categories/{id},/shops/{shopid}/categories/{id}/subcategories,/shops/{shopid}/spus,/shops/{shopid}/spus/{id},/shops/{shopid}/skus/{id}/onshelves,/shops/{shopid}/skus/{id}/offshelves,/shops/{shopid}/skus/{id}/floatPrices,/shops/{shopid}/floatPrices/{id},/shops/{shopid}/brands,/shops/{shopid}/brands/{id}/uploadImg,/shops/{shopid}/brands/{id},/shops/{shopid}/spus/{spuId}/categories/{id},/shops/{shopid}/spus/{spuId}/brands/{id},/shops/{shopid}/offshelves,/shops/{shopid}/onshelves
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+#        - id: flashsaleWithoutToken
+#          uri: lb://flashsale-service
+#          predicates:
+#            - Method=GET
+#            - Path=/timesegments/{id}/flashsales,/flashsales/current
+#          filters:
+#            - PrefixPath=/goods
+        - id: flashsale
+          uri: lb://flashsale-service
+          predicates:
+            - Path=/shops/{shopid}/timesegments/{id}/flashsales,/shops/{shopid}/flashsales/{id},/shops/{shopid}/flashsales/{id}/onshelves,/shops/{shopid}/flashsales/{id}/offshelves,/shops/{shopid}/flashsales/{id}/flashitems,/shops/{shopid}/flashsales/{fid}/flashitems/{id}
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+        - id: commentWithoutToken
+          uri: lb://goods-service
+          predicates:
+            - Path=/comments/states
+          filters:
+            - PrefixPath=/goods
+        - id: comment
+          uri: lb://goods-service
+          predicates:
+            - Path=/shops/{shopid}/comments/{id}/confirm,/shops/{shopid}/comments/all
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+        - id: couponWithoutToken
+          uri: lb://activity-service
+          predicates:
+            - Path=/coupons/states
+          filters:
+            - PrefixPath=/goods
+        - id: coupon
+          uri: lb://activity-service
+          predicates:
+            - Path=/shops/{shopid}/couponactivities,/shops/{shopid}/couponactivities/{id}/uploadImg,/shops/{shopid}/couponactivities/invalid,/shops/{shopid}/couponactivities/{id},/shops/{shopid}/couponactivities/{id}/skus,/shops/{shopid}/couponskus/{id},/shops/{shopid}/couponactivities/{id}/onshelves,/shops/{shopid}/couponactivities/{id}/offshelves
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+        - id: presaleWithoutToken
+          uri: lb://activity-service
+          predicates:
+            - Path=/presales/states
+          filters:
+            - PrefixPath=/goods
+        - id: presale
+          uri: lb://activity-service
+          predicates:
+            - Path=/shops/{shopid}/presales,/shops/{shopid}/skus/{id}/presales,/shops/{shopid}/presales/{id},/shops/{shopid}/presales/{id}/onshelves,/shops/{shopid}/presales/{id}/offshelves
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+        - id: grouponWithoutToken
+          uri: lb://activity-service
+          predicates:
+            - Path=/groupons/states
+          filters:
+            - PrefixPath=/goods
+        - id: groupon
+          uri: lb://activity-service
+          predicates:
+            - Path=/shops/{shopid}/groupons,/shops/{shopid}/groupons/{id},/shops/{shopid}/spus/{id}/groupons,/shops/{shopid}/groupons/{id}/onshelves,/shops/{shopid}/groupons/{id}/offshelves
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+        - id: shopWithoutToken
+          uri: lb://goods-service
+          predicates:
+            - Path=/shops/states
+          filters:
+            - PrefixPath=/goods
+        - id: shop
+          uri: lb://goods-service
+          predicates:
+            - Path=/shops,/shops/{id},/shops/{shopid}/newshops/{id}/audit,/shops/{id}/onshelves,/shops/{id}/offshelves
+          filters:
+            - PrefixPath=/goods
+            - Auth=authorization
+
+        - id: log
+          uri: lb://log-service
+          predicates:
+            - Path=/shops/{shopid}/logs
+          filters:
+            - PrefixPath=/other
+            - Auth=authorization
+
+  redis:
+    # Redis服务器地址
+    host: localhost
+    # Redis服务器连接端口
+    port: 6379
+    # Redis服务器连接密码
+#    password: 123456
+    # Redis数据库索引（默认为0）
+    database: 0
+    #连接池最大连接数（使用负值表示没有限制）
+    lettuce:
+      pool:
+        max-active: 100
+        # 连接池中的最大空闲连接
+        max-idle: 100
+        # 连接池中的最小空闲连接
+        min-idle: 0
+        #连接池最大阻塞等待时间（使用负值表示没有限制）
+        max-wait: -1
+    # 连接超时时间（毫秒）
+    timeout: 5000
+
+
+management:
+  endpoint:
+    gateway:
+      enabled: true
+
+# 配置rocketmq
+rocketmq:
+  # 指定namesrv地址
+  name-server: 172.16.4.31:9876
+  producer:
+    #生产者group名称
+    group: producer_group
+    #一次发送多少数量消息
+    max-message-size: 4096
+    #发送消息超时时间,默认3000
+    send-message-timeout: 3000
+    #发送消息失败重试次数，默认2
+    retry-times-when-send-async-failed: 2
+
+# 网关token相关配置
+privilegegateway:
+  jwtExpire: 3600
+  refreshJwtTime: 60
